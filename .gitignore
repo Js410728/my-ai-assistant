@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.docx
+*.xlsx
+*.pptx
+*.log
+.DS_Store
+2.py/
+PPT.py
+PPT1.py
+pygame.py
+pygamedemo.py
