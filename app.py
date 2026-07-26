@@ -72,10 +72,20 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("🤔 思考中..."):
             try:
-                # 注意：run_agent 是异步函数，需要 asyncio.run 执行
-                response = asyncio.run(run_agent(user_input))
+                # 🔥 关键：传入 conversation_history
+                response = asyncio.run(run_agent(user_input, st.session_state.conversation_history))
                 st.write(response)
+                
+                # 3. 更新界面消息列表
                 st.session_state.messages.append({"role": "assistant", "content": response})
+                
+                # 4. 更新对话历史（用于 Agent 记忆）
+                st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                st.session_state.conversation_history.append({"role": "assistant", "content": response})
+                
+                # 5. 只保留最近 3 轮（6 条消息），防止历史过长
+                if len(st.session_state.conversation_history) > 6:
+                    st.session_state.conversation_history = st.session_state.conversation_history[-6:]
             except Exception as e:
                 error_msg = f"❌ 出错了：{str(e)}"
                 st.error(error_msg)
