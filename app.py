@@ -61,8 +61,7 @@ if "conversation_history" not in st.session_state:
 # 显示历史聊天记录
 # ============================================
 for msg in st.session_state.messages:
-    with st.chat_message(msg["" \
-    "role"]):
+    with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
 # ============================================
