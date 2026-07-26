@@ -203,7 +203,26 @@ def call_llm(messages, tools=None):
     # 发起 POST 请求，timeout=30 表示最多等待 30 秒
     resp = requests.post(URL, headers=headers, json=payload, timeout=30)
     return resp.json()  # 将返回的 JSON 字符串解析为 Python 字典
-
+def call_llm_stream(messages, tools=None):
+    """
+    流式调用 DeepSeek API，返回一个生成器（逐块输出）
+    """
+    API_KEY = os.getenv("DEEPSEEK_API_KEY")
+    URL = "https://api.deepseek.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "deepseek-v4-pro",
+        "messages": messages,
+        "tools": tools,
+        "tool_choice": "auto",
+        "stream": True  # 关键：开启流式
+    }
+    # 使用 requests 的 stream 模式
+    response = requests.post(URL, headers=headers, json=payload, stream=True, timeout=60)
+    return response  # 返回原始响应对象，用于迭代
 
 # ============================================
 # 3. 工具说明书（Tools 定义）

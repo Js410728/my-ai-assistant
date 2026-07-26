@@ -2,11 +2,14 @@ import streamlit as st
 import asyncio
 import sys
 import os
+import json
+import requests
+from dotenv import load_dotenv
 
 # 导入你原来的 Agent 核心（复用代码，不重复造轮子！）
 # 注意：需要把 weather.py 中的 run_agent 等函数导入进来
 sys.path.append(os.path.dirname(__file__))
-from weather import run_agent
+from weather import call_llm_stream, tools, run_agent
 
 # ============================================
 # 页面配置（必须放在最前面）
@@ -73,25 +76,54 @@ if user_input:
     with st.chat_message("user"):
         st.write(user_input)
     
-    # 2. 调用 Agent（复用 weather.py 中的 run_agent）
+     # 2. 构建消息（包含历史）
+    messages = [
+        {"role": "system", "content": "你是一个智能助手，根据用户问题自动调用合适的工具获取信息。你可以使用的工具包括：get_weather（天气查询）、get_weather_forecast（天气预报）、get_hot_news（热门新闻）、get_stock_price（股票价格）。请注意，你没有 web_search 工具。"}
+    ]
+    if st.session_state.conversation_history:
+        recent = st.session_state.conversation_history[-6:] if len(st.session_state.conversation_history) > 6 else st.session_state.conversation_history
+        messages.extend(recent)
+    messages.append({"role": "user", "content": user_input})
+
+    # 3. 调用流式 API
     with st.chat_message("assistant"):
-        with st.spinner("🤔 思考中..."):
-            try:
-                # 🔥 关键：传入 conversation_history
-                response = asyncio.run(run_agent(user_input, st.session_state.conversation_history))
-                st.write(response)
+        placeholder = st.empty()
+        full_response = ""
+        
+        try:
+            # 调用流式 API
+            stream_response = call_llm_stream(messages, tools=tools)
+            
+            # 解析流式响应（SSE 格式）
+            for line in stream_response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data = line[6:]  # 去掉 "data: " 前缀
+                        if data == '[DONE]':
+                            break
+                        try:
+                            chunk = json.loads(data)
+                            if 'choices' in chunk and len(chunk['choices']) > 0:
+                                delta = chunk['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    full_response += content
+                                    placeholder.write(full_response + "▌")
+                        except json.JSONDecodeError:
+                            pass
+            
+            # 最终去掉光标
+            placeholder.write(full_response)
+            
+            # 4. 更新会话历史
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            st.session_state.conversation_history.append({"role": "user", "content": user_input})
+            st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
+            if len(st.session_state.conversation_history) > 6:
+                st.session_state.conversation_history = st.session_state.conversation_history[-6:]
                 
-                # 3. 更新界面消息列表
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                
-                # 4. 更新对话历史（用于 Agent 记忆）
-                st.session_state.conversation_history.append({"role": "user", "content": user_input})
-                st.session_state.conversation_history.append({"role": "assistant", "content": response})
-                
-                # 5. 只保留最近 3 轮（6 条消息），防止历史过长
-                if len(st.session_state.conversation_history) > 6:
-                    st.session_state.conversation_history = st.session_state.conversation_history[-6:]
-            except Exception as e:
-                error_msg = f"❌ 出错了：{str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        except Exception as e:
+            error_msg = f"❌ 出错了：{str(e)}"
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
