@@ -107,9 +107,10 @@ if user_input:
                             if 'choices' in chunk and len(chunk['choices']) > 0:
                                 delta = chunk['choices'][0].get('delta', {})
                                 if 'content' in delta:
-                                    content = delta['content']
-                                    full_response += content
-                                    placeholder.write(full_response + "▌")
+                                    content = delta.get('content', '')   # 如果 content 不存在或为 None，返回空字符串
+                                    if content:
+                                        full_response += content
+                                        placeholder.write(full_response + "▌")
                         except json.JSONDecodeError:
                             pass
             
