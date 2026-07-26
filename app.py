@@ -50,6 +50,11 @@ if "messages" not in st.session_state:
     ]
 
 # ============================================
+# 对话历史（用于 Agent 的记忆）
+# ============================================
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []   # 存储结构：[{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}, ...]
+# ============================================
 # 显示历史聊天记录
 # ============================================
 for msg in st.session_state.messages:
