@@ -75,55 +75,31 @@ if user_input:
     with st.chat_message("user"):
         st.write(user_input)
     
-     # 2. 构建消息（包含历史）
-    messages = [
-        {"role": "system", "content": "你是一个智能助手，根据用户问题自动调用合适的工具获取信息。你可以使用的工具包括：get_weather（天气查询）、get_weather_forecast（天气预报）、get_hot_news（热门新闻）、get_stock_price（股票价格）。请注意，你没有 web_search 工具。"}
-    ]
-    if st.session_state.conversation_history:
-        recent = st.session_state.conversation_history[-6:] if len(st.session_state.conversation_history) > 6 else st.session_state.conversation_history
-        messages.extend(recent)
-    messages.append({"role": "user", "content": user_input})
-
-    # 3. 调用流式 API
+    # 2. 调用 Agent（非流式）
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        full_response = ""
-        
-        try:
-            # 调用流式 API
-            stream_response = call_llm_stream(messages, tools=tools)
-            
-            # 解析流式响应（SSE 格式）
-            for line in stream_response.iter_lines():
-                if line:
-                    line = line.decode('utf-8')
-                    if line.startswith('data: '):
-                        data = line[6:]  # 去掉 "data: " 前缀
-                        if data == '[DONE]':
-                            break
-                        try:
-                            chunk = json.loads(data)
-                            if 'choices' in chunk and len(chunk['choices']) > 0:
-                                delta = chunk['choices'][0].get('delta', {})
-                                if 'content' in delta:
-                                    content = delta.get('content', '')   # 如果 content 不存在或为 None，返回空字符串
-                                    if content:
-                                        full_response += content
-                                        placeholder.write(full_response + "▌")
-                        except json.JSONDecodeError:
-                            pass
-            
-            # 最终去掉光标
-            placeholder.write(full_response)
-            
-            # 4. 更新会话历史
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            st.session_state.conversation_history.append({"role": "user", "content": user_input})
-            st.session_state.conversation_history.append({"role": "assistant", "content": full_response})
-            if len(st.session_state.conversation_history) > 6:
-                st.session_state.conversation_history = st.session_state.conversation_history[-6:]
+        with st.spinner("🤔 思考中..."):
+            try:
+                # 使用原来的 run_agent（非流式）
+                response = asyncio.run(run_agent(user_input, st.session_state.conversation_history))
                 
-        except Exception as e:
-            error_msg = f"❌ 出错了：{str(e)}"
-            st.error(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                # 3. 模拟逐字输出
+                placeholder = st.empty()
+                full_response = ""
+                for char in response:
+                    full_response += char
+                    placeholder.write(full_response + "▌")
+                    import time
+                    time.sleep(0.02)  # 每字间隔20ms
+                placeholder.write(full_response)
+                
+                # 4. 更新会话历史
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.session_state.conversation_history.append({"role": "user", "content": user_input})
+                st.session_state.conversation_history.append({"role": "assistant", "content": response})
+                if len(st.session_state.conversation_history) > 6:
+                    st.session_state.conversation_history = st.session_state.conversation_history[-6:]
+                    
+            except Exception as e:
+                error_msg = f"❌ 出错了：{str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
