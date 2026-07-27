@@ -4,8 +4,8 @@ aiohttp
 python-dotenv
 yfinance
 chromadb
-sentence-transformers
 faiss-cpu
 pypdf
 pandas
 openpyxl
+fastembed
