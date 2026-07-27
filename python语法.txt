@@ -1,0 +1,6 @@
+
+阶段	学习内容	实践项目	工具/框架
+第 1-2 周	对话记忆 + 向量数据库	让 Agent 记住用户偏好	ChromaDB, LangChain Memory
+第 3-4 周	任务拆解 + ReAct 模式	旅行规划 Agent（多步骤）	LangGraph, ReAct Prompt
+第 5-6 周	多智能体协作	报告生成系统（主管+子Agent）	LangGraph (Multi-Agent)
+第 7-8 周	生产级优化（流式输出、可观测性、成本控制）	优化现有的 Agent 项目	LangSmith, Streaming

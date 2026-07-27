@@ -30,11 +30,14 @@ load_dotenv()
 # 执行加载 .env 文件的操作。默认会在当前目录查找 .env 文件
 # 加载后，可以通过 os.getenv("变量名") 读取
 
-
+from datetime import datetime
 # ============================================
 # 1. 异步工具函数（Agent 可以调用的工具）
 # ============================================
-
+async def get_current_date():
+    """获取当前日期和星期几"""
+    now = datetime.now()
+    return f"今天是 {now.strftime('%Y年%m月%d日')}，星期{['一','二','三','四','五','六','日'][now.weekday()]}"
 async def get_hot_news():
     """
     获取热门新闻（当前为模拟数据，用于测试）
@@ -232,6 +235,18 @@ def call_llm_stream(messages, tools=None):
 # 大模型会根据这些定义来判断何时调用哪个工具
 tools = [
     {
+        "type": "function",
+        "function": {
+            "name": "get_current_date",
+            "description": "获取当前日期和星期几，当用户问‘今天几号’、‘现在是什么时候’、或者需要规划行程时使用",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
         "type": "function",   # 固定写法：表示这是一个函数工具
         "function": {
             "name": "get_weather",   # 工具名称，必须和实际函数名一致
@@ -309,6 +324,55 @@ tools = [
 # ============================================
 
 async def run_agent(user_query, history=None):
+    # ========== 新增：任务规划逻辑 ==========
+    from planner import plan_steps
+    
+    # 先判断是否需要规划（简单问题直接走原流程）
+    simple_keywords = ["天气", "新闻", "股价", "快递", "温度", "预报"]
+    is_complex = True
+    for kw in simple_keywords:
+        if kw in user_query and len(user_query) < 20:
+            is_complex = False
+            break
+    
+    if is_complex:
+        print(f"🧠 识别为复杂任务，启动规划器...")
+        steps = plan_steps(user_query)
+        print(f"📋 规划步骤：{steps}")
+        
+        # 执行每个步骤（这里简化：把步骤拼成提示词，让大模型直接回答）
+        # 更高级的方式是逐步执行并收集结果，我们一步步来
+        step_results = []
+        for step in steps:
+            # 先用一个简单的方式：把步骤交给大模型执行
+            # 未来可以改为实际调用工具
+            step_prompt = f"你正在执行一个子任务。原始需求是：{user_query}。当前步骤是：{step}。请完成这个步骤，并返回结果。"
+            step_response = call_llm([
+                {"role": "system", "content": "你是一个执行专家，严格按照要求完成子任务。"},
+                {"role": "user", "content": step_prompt}
+            ])
+            result = step_response['choices'][0]['message']['content']
+            step_results.append(f"【{step}】\n{result}")
+        
+        # 汇总所有步骤结果
+        summary_prompt = f"""用户原始需求：{user_query}
+        
+下面是各步骤的执行结果：
+{'='*40}
+{chr(10).join(step_results)}
+{'='*40}
+
+请综合以上信息，给用户一个完整、清晰的最终回答。
+"""
+        final_response = call_llm([
+            {"role": "system", "content": "你是一个总结专家，善于把零散信息整合成完整回答。"},
+            {"role": "user", "content": summary_prompt}
+        ])
+        return final_response['choices'][0]['message']['content']
+    
+    # ========== 原有逻辑（简单问题走原流程） ==========
+    # ... 你原来的 run_agent 代码保持不变 ...
+    # （复制你原来的代码到这里）
     """
     Agent 主入口
     user_query: 用户输入的文本
@@ -369,6 +433,8 @@ async def run_agent(user_query, history=None):
                 return await get_stock_price(args['symbol'])
             elif tool_name == "get_express":
                 return await get_express(args['company'], args['number'])
+            elif tool_name == "get_current_date":
+                return await get_current_date()
             else:
                 return "未知工具"
         
