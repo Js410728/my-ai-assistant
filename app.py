@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import requests
+import rag
 from dotenv import load_dotenv
 
 # 导入你原来的 Agent 核心（复用代码，不重复造轮子！）
@@ -19,7 +20,19 @@ st.set_page_config(
     page_icon="🤖",
     layout="centered"
 )
-
+# ============================================
+# 加载示例文档到知识库（用于测试 RAG）
+# ============================================
+import rag
+sample_docs = [
+    "公司员工每年享有5天带薪年假。",
+    "请假需要提前3天在OA系统提交申请。",
+    "公司提供免费的咖啡和下午茶。",
+    "上班时间是上午9点到下午6点。",
+]
+# 为每个文档生成一个唯一ID
+doc_ids = [f"doc_{i}" for i in range(len(sample_docs))]
+rag.add_documents(sample_docs, doc_ids)
 # ============================================
 # 界面标题
 # ============================================
@@ -74,13 +87,33 @@ if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.write(user_input)
+        #---- 新增：RAG 检索逻辑 ----
+    # 从知识库中检索与用户问题相关的文档片段
+    retrieved_chunks = rag.query_knowledge_base(user_input)
+    context = "\n\n".join(retrieved_chunks) if retrieved_chunks else ""
+    
+    # 构建包含上下文的系统提示词
+    system_prompt = "你是一个智能助手，根据用户问题自动调用合适的工具获取信息。"
+    if context:
+        system_prompt += f"\n\n请基于以下参考资料回答用户的问题。如果参考资料中没有相关信息，请如实告知。\n\n参考资料：\n{context}"
+    # ---- RAG 逻辑结束 ----
     
     # 2. 调用 Agent（非流式）
     with st.chat_message("assistant"):
         with st.spinner("🤔 思考中..."):
             try:
+                # 注意：这里不需要修改，run_agent 会自动使用我们构建好的 messages
+                # 但我们之前没有把 messages 传进去？实际上 run_agent 内部会自己构建 messages
+                # 所以我们需要改用另一种方式：直接调用 call_llm 或者修改 run_agent
+                # 为了最小改动，我们保持 run_agent 不变，而是把检索到的上下文加到 user_input 里
+                # 或者直接给 run_agent 传一个额外的 context 参数
+                
+                # 最简单的方式：把上下文拼到用户输入里
+                enhanced_input = user_input
+                if context:
+                    enhanced_input = f"【参考资料】\n{context}\n\n【用户问题】\n{user_input}"
                 # 使用原来的 run_agent（非流式）
-                response = asyncio.run(run_agent(user_input, st.session_state.conversation_history))
+                response = asyncio.run(run_agent(enhanced_input, st.session_state.conversation_history))
                 
                 # 3. 模拟逐字输出
                 placeholder = st.empty()
