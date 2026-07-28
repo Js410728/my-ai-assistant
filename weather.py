@@ -21,6 +21,7 @@ import json
 import aiohttp
 # aiohttp：异步 HTTP 客户端，用于异步调用外部 API（如天气、新闻接口）
 # 与 requests 不同，aiohttp 支持 async/await，适合并发请求
+import tushare as ts
 
 from dotenv import load_dotenv
 # python-dotenv：用于从 .env 文件中加载环境变量到 Python 进程
@@ -29,11 +30,26 @@ from dotenv import load_dotenv
 load_dotenv()
 # 执行加载 .env 文件的操作。默认会在当前目录查找 .env 文件
 # 加载后，可以通过 os.getenv("变量名") 读取
+# 读取 DeepSeek Key
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+if not DEEPSEEK_API_KEY:
+    print("⚠️ 警告：未找到 DEEPSEEK_API_KEY")
 
+# 读取 Tushare Token
+TUSHARE_TOKEN = os.getenv("TUSHARE_TOKEN")
+
+# 如果 Token 存在，初始化 Tushare
+if TUSHARE_TOKEN:
+    ts.set_token(TUSHARE_TOKEN)
+    pro = ts.pro_api()
+    print("✅ Tushare 初始化成功")
+else:
+    print("⚠️ Tushare Token 未配置，基金功能不可用")
 from datetime import datetime
 # ============================================
 # 1. 异步工具函数（Agent 可以调用的工具）
 # ============================================
+
 async def get_current_date():
     """获取当前日期和星期几"""
     now = datetime.now()
@@ -185,7 +201,7 @@ def call_llm(messages, tools=None):
     """
     # 从环境变量中读取 DeepSeek API Key（在 .env 文件中配置）
     API_KEY = os.getenv("DEEPSEEK_API_KEY")
-    
+
     # DeepSeek 的 API 地址（兼容 OpenAI 格式）
     URL = "https://api.deepseek.com/v1/chat/completions"
     
@@ -226,7 +242,63 @@ def call_llm_stream(messages, tools=None):
     # 使用 requests 的 stream 模式
     response = requests.post(URL, headers=headers, json=payload, stream=True, timeout=60)
     return response  # 返回原始响应对象，用于迭代
+import akshare as ak
 
+async def search_fund(keyword: str):
+    """搜索基金，返回匹配的基金列表"""
+    # 搜索基金
+    df = ak.fund_name_em()  # 获取所有基金列表
+    result = df[df['基金名称'].str.contains(keyword) | df['基金代码'].str.contains(keyword)]
+    return result[['基金代码', '基金名称', '基金类型']].head(10).to_dict('records')
+
+
+
+
+# 设置 token（从环境变量读取）
+ts.set_token(os.getenv("TUSHARE_TOKEN"))
+pro = ts.pro_api()
+
+async def search_fund(keyword: str):
+    """
+    根据关键词搜索基金（名称或代码）
+    """
+    # Tushare 的 fund_basic 接口获取所有基金列表
+    df = pro.fund_basic()
+    # 筛选包含关键词的基金
+    result = df[df['name'].str.contains(keyword) | df['ts_code'].str.contains(keyword)]
+    # 返回前10条
+    return result[['ts_code', 'name', 'fund_type']].head(10).to_dict('records')
+
+async def get_fund_info(fund_code: str):
+    """
+    获取基金详细信息（净值、类型、规模等）
+    """
+    # 基金基本信息
+    basic = pro.fund_basic(ts_code=fund_code)
+    if basic.empty:
+        return {"error": "未找到该基金"}
+    
+    # 基金净值（最近30天）
+    nav = pro.fund_nav(ts_code=fund_code, limit=30)
+    
+    info = {
+        "代码": fund_code,
+        "名称": basic.iloc[0]['name'],
+        "类型": basic.iloc[0]['fund_type'],
+        "管理人": basic.iloc[0]['management'],
+        "成立日期": basic.iloc[0]['setup_date'],
+        "最新净值": nav.iloc[0]['nav'] if not nav.empty else "暂无",
+        "累计净值": nav.iloc[0]['accum_nav'] if not nav.empty else "暂无",
+        "净值日期": nav.iloc[0]['nav_date'] if not nav.empty else "暂无",
+    }
+    return info
+
+async def get_fund_nav_history(fund_code: str, start_date: str, end_date: str):
+    """
+    获取基金历史净值区间
+    """
+    df = pro.fund_nav(ts_code=fund_code, start_date=start_date, end_date=end_date)
+    return df[['nav_date', 'nav', 'accum_nav']].to_dict('records')
 # ============================================
 # 3. 工具说明书（Tools 定义）
 # ============================================
@@ -313,6 +385,50 @@ tools = [
                     "number": {"type": "string", "description": "快递单号，如：SF1234567890"}
                 },
                 "required": ["company", "number"]
+            }
+        }
+    }
+    {
+        "type": "function",
+        "function": {
+            "name": "search_fund",
+            "description": "根据关键词搜索基金，返回匹配的基金列表（含代码和名称）。当用户想找某类基金但不知道代码时使用。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "搜索关键词，如：'白酒'、'沪深300'、'161725'"}
+                },
+                "required": ["keyword"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_fund_info",
+            "description": "获取单只基金的详细信息（类型、管理人、最新净值、成立日期等）。用于深度分析某只基金。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fund_code": {"type": "string", "description": "基金代码，如 161725"}
+                },
+                "required": ["fund_code"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_fund_nav_history",
+            "description": "获取基金在指定时间段内的历史净值数据。用于分析基金走势。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fund_code": {"type": "string", "description": "基金代码"},
+                    "start_date": {"type": "string", "description": "起始日期，格式YYYYMMDD"},
+                    "end_date": {"type": "string", "description": "结束日期，格式YYYYMMDD"}
+                },
+                "required": ["fund_code", "start_date", "end_date"]
             }
         }
     }
@@ -435,6 +551,12 @@ async def run_agent(user_query, history=None):
                 return await get_express(args['company'], args['number'])
             elif tool_name == "get_current_date":
                 return await get_current_date()
+            elif tool_name == "search_fund":
+                return await search_fund(args['keyword'])
+            elif tool_name == "get_fund_info":
+                return await get_fund_info(args['fund_code'])
+            elif tool_name == "get_fund_nav_history":
+                return await get_fund_nav_history(args['fund_code'], args['start_date'], args['end_date'])
             else:
                 return "未知工具"
         

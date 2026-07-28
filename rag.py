@@ -237,7 +237,6 @@ def extract_text_from_excel(file_path: str) -> str:
         engine = 'xlrd'  # 需要 pip install xlrd
     else:
         engine = 'openpyxl'
-    
     df = pd.read_excel(file_path, engine=engine)
     text = ""
     for col in df.columns:

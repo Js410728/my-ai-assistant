@@ -93,7 +93,7 @@ with st.sidebar:
                 doc_ids = [f"file_{uploaded_file.name}_{i}_{int(time.time())}" for i in range(len(chunks))]
                 rag.add_documents(chunks, doc_ids, file_name=uploaded_file.name)
                 st.success(f"✅ 已解析并添加 {len(chunks)} 条知识")
-                st.rerun()
+                #st.rerun()
             else:
                 st.warning("⚠️ 文件内容为空或无法解析")
         except Exception as e:
