@@ -121,8 +121,23 @@ def delete_file_by_name(file_name):
     根据文件名删除知识库中对应的所有文档片段
     """
     global documents, doc_vectors, file_names
+    
     if file_name not in file_names:
         print(f"⚠️ 文件 {file_name} 不存在于知识库中")
+        return False
+    
+    # 但我们没有 doc_meta，所以无法知道每个文档属于哪个文件
+    # 临时方案：清空整个知识库（因为无法精准删除）
+    # 但更好的方案是添加 doc_meta 记录映射关系
+    # 现在我们先简单处理：如果只有一个文件，清空知识库；如果有多个，无法精准删除
+    if len(file_names) == 1:
+        clear_knowledge_base()
+        print(f"🗑️ 已删除唯一的文件 {file_name}，知识库已清空")
+        return True
+    else:
+        # 如果有多个文件，我们需要 doc_meta 才能精准删除
+        # 但当前版本没有 doc_meta，所以只能提示用户清空整个知识库
+        print(f"⚠️ 当前版本无法精准删除单个文件。建议使用「清空知识库」功能。")
         return False
 
 # ============================================
