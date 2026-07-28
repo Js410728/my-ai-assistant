@@ -230,8 +230,15 @@ def extract_text_from_pdf(file_path: str) -> str:
     return text
 
 def extract_text_from_excel(file_path: str) -> str:
+    """从 Excel 文件中提取所有文本，支持 .xlsx 和 .xls"""
     import pandas as pd
-    df = pd.read_excel(file_path, engine='openpyxl')
+    # 根据扩展名选择引擎
+    if file_path.endswith('.xls'):
+        engine = 'xlrd'  # 需要 pip install xlrd
+    else:
+        engine = 'openpyxl'
+    
+    df = pd.read_excel(file_path, engine=engine)
     text = ""
     for col in df.columns:
         col_text = " ".join([str(v) for v in df[col].dropna() if str(v).strip()])
