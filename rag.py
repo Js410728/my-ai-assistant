@@ -13,7 +13,6 @@ DOCS_FILE = "docs.pkl"          # 存储文档内容列表 (list of str)
 VECTORS_FILE = "vectors.npy"    # 存储向量数组 (numpy array)
 FILE_NAMES_FILE = "file_names.pkl"   # 存储文件名列表 (list of str)
 DOC_META_FILE = "doc_meta.pkl"  # 存储每个文档对应的文件名 (list of str, 与 documents 一一对应)
-
 # 初始化嵌入模型
 embedding_model = TextEmbedding(model_name="BAAI/bge-small-en")
 
