@@ -43,6 +43,8 @@ st.caption("支持天气查询 · 未来预报 · 刚学会，后期更新其他
 # ============================================
 # 侧边栏：功能介绍
 # ============================================
+# app.py 侧边栏添加
+enable_multi_agent = st.checkbox("启用多智能体模式", value=False)
 with st.sidebar:
     st.header("💡 使用说明")
     st.markdown("""
@@ -74,7 +76,16 @@ with st.sidebar:
         file_list = rag.get_file_names()
         if file_list:
             for fname in file_list:
-                st.write(f"📄 {fname}")
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"📄 {fname}")
+                with col2:
+                    if st.button("🗑️", key=f"del_{fname}"):
+                        if rag.delete_file_by_name(fname):
+                            st.success(f"已删除 {fname}")
+                            st.rerun()
+                        else:
+                            st.error(f"删除 {fname} 失败")
             st.caption(f"共 {len(file_list)} 个文件")
         else:
             st.info("暂无已上传的文件")
@@ -189,7 +200,11 @@ if user_input:
             st.session_state.conversation_history.append({"role": "assistant", "content": response})
             if len(st.session_state.conversation_history) > 6:
                 st.session_state.conversation_history = st.session_state.conversation_history[-6:]
-                
+            if enable_multi_agent:
+                from multi_agent import supervisor
+                response = asyncio.run(supervisor(enhanced_input, st.session_state.conversation_history))
+            else:
+                response = asyncio.run(run_agent(enhanced_input, st.session_state.conversation_history))
         except Exception as e:
             error_msg = f"❌ 出错了：{str(e)}"
             placeholder.error(error_msg)

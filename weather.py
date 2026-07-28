@@ -204,7 +204,7 @@ def call_llm(messages, tools=None):
     }
     
     # 发起 POST 请求，timeout=30 表示最多等待 30 秒
-    resp = requests.post(URL, headers=headers, json=payload, timeout=30)
+    resp = requests.post(URL, headers=headers, json=payload, timeout=120)
     return resp.json()  # 将返回的 JSON 字符串解析为 Python 字典
 def call_llm_stream(messages, tools=None):
     """
@@ -463,6 +463,28 @@ async def run_agent(user_query, history=None):
     else:
         # 如果大模型没有调用工具，直接返回它的文本回复
         return message['content']
+# weather.py 末尾添加
+async def run_agent_custom_system(user_query, history=None, system_prompt=None):
+    """
+    与 run_agent 类似，但允许自定义 system_prompt。
+    如果 system_prompt 为 None，则使用默认值。
+    """
+    if system_prompt is None:
+        system_prompt = "你是一个智能助手，根据用户问题自动调用合适的工具获取信息。"
+    
+    if history is None:
+        history = []
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        recent = history[-6:] if len(history) > 6 else history
+        messages.extend(recent)
+    messages.append({"role": "user", "content": user_query})
+    
+    # 后续逻辑与 run_agent 完全相同（复制那段代码）
+    # 这里省略，直接调用 call_llm + 执行工具，你可以复制原 run_agent 的代码。
+    # 为了篇幅，我以注释表示，具体实现我们下一步一起完成。
+    pass
 
 
 # ============================================

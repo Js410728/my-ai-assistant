@@ -116,6 +116,14 @@ def add_documents(docs, ids, file_name=None):
     
     # 🔥 关键：每次添加后自动保存到硬盘
     save_knowledge_base()
+def delete_file_by_name(file_name):
+    """
+    根据文件名删除知识库中对应的所有文档片段
+    """
+    global documents, doc_vectors, file_names
+    if file_name not in file_names:
+        print(f"⚠️ 文件 {file_name} 不存在于知识库中")
+        return False
 
 # ============================================
 # 5. 检索文档
@@ -137,8 +145,7 @@ def query_knowledge_base(query, n_results=3):
     dim = doc_vectors.shape[1]
     index = faiss.IndexFlatIP(dim)
     index.add(vectors_norm.astype(np.float32))
-    distances, indices = index.search(query_norm.astype(np.float32), n_results)
-    
+    distances, indices = index.search(query_norm.astype(np.float32), n_results) 
     # 收集结果
     results = []
     for idx in indices[0]:
