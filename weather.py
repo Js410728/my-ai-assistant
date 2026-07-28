@@ -242,15 +242,6 @@ def call_llm_stream(messages, tools=None):
     # 使用 requests 的 stream 模式
     response = requests.post(URL, headers=headers, json=payload, stream=True, timeout=60)
     return response  # 返回原始响应对象，用于迭代
-import akshare as ak
-
-async def search_fund(keyword: str):
-    """搜索基金，返回匹配的基金列表"""
-    # 搜索基金
-    df = ak.fund_name_em()  # 获取所有基金列表
-    result = df[df['基金名称'].str.contains(keyword) | df['基金代码'].str.contains(keyword)]
-    return result[['基金代码', '基金名称', '基金类型']].head(10).to_dict('records')
-
 
 
 
@@ -387,7 +378,7 @@ tools = [
                 "required": ["company", "number"]
             }
         }
-    }
+    },
     {
         "type": "function",
         "function": {
