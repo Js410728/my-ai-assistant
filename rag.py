@@ -3,6 +3,7 @@
 # ============================================
 
 import os
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import numpy as np
 import pickle
 from fastembed import TextEmbedding
